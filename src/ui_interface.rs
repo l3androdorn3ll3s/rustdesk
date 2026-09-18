@@ -913,7 +913,7 @@ pub fn get_langs() -> String {
 
 #[inline]
 pub fn video_save_directory(root: bool) -> String {
-    let appname = crate::get_app_name();
+    let appname = crate::get_data_app_dir();
     // ui process can show it correctly Once vidoe process created it.
     let try_create = |path: &std::path::Path| {
         if !path.exists() {

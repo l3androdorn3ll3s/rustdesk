@@ -250,17 +250,19 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
 class MyTheme {
   MyTheme._();
 
-  static const Color grayBg = Color(0xFFEFEFF2);
-  static const Color accent = Color(0xFF0071FF);
-  static const Color accent50 = Color(0x770071FF);
-  static const Color accent80 = Color(0xAA0071FF);
+  static const Color grayBg = Color(0xFFF7F5F0);
+  static const Color brandSidebar = Color(0xFFE8E1D5);
+  static const Color brandDark = Color(0xFF252117);
+  static const Color accent = Color(0xFFDC9919);
+  static const Color accent50 = Color(0x77DC9919);
+  static const Color accent80 = Color(0xAADC9919);
   static const Color canvasColor = Color(0xFF212121);
   static const Color border = Color(0xFFCCCCCC);
   static const Color idColor = Color(0xFF00B6F0);
   static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
   static const Color cmIdColor = Color(0xFF21790B);
   static const Color dark = Colors.black87;
-  static const Color button = Color(0xFF2C8CFF);
+  static const Color button = Color(0xFFDC9919);
   static const Color hoverBorder = Color(0xFF999999);
 
   // ListTile
@@ -454,7 +456,7 @@ class MyTheme {
         style:
             MenuStyle(backgroundColor: MaterialStatePropertyAll(Colors.white))),
     colorScheme: ColorScheme.light(
-        primary: Colors.blue, secondary: accent, background: grayBg),
+        primary: accent, secondary: accent, background: grayBg),
     popupMenuTheme: PopupMenuThemeData(
         color: Colors.white,
         shape: RoundedRectangleBorder(
@@ -562,7 +564,7 @@ class MyTheme {
         style: MenuStyle(
             backgroundColor: MaterialStatePropertyAll(Color(0xFF121212)))),
     colorScheme: ColorScheme.dark(
-      primary: Colors.blue,
+      primary: accent,
       secondary: accent,
       background: Color(0xFF24252B),
     ),
@@ -579,7 +581,11 @@ class MyTheme {
   );
 
   static ThemeMode getThemeModePreference() {
-    return themeModeFromString(bind.mainGetLocalOption(key: kCommConfKeyTheme));
+    final value = bind.mainGetLocalOption(key: kCommConfKeyTheme);
+    if (value.isEmpty) {
+      return ThemeMode.dark;
+    }
+    return themeModeFromString(value);
   }
 
   static Future<void> changeDarkMode(ThemeMode mode) async {
@@ -1323,7 +1329,7 @@ Color? _msgboxColor(String type) {
   if (type.contains("error") || type == "re-input-password") {
     return Color(0xFFE04F5F);
   }
-  return Color(0xFF2C8CFF);
+  return Color(0xFFDC9919);
 }
 
 Widget msgboxIcon(String type) {
@@ -3760,14 +3766,15 @@ Widget loadPowered(BuildContext context) {
   ).marginOnly(top: 6);
 }
 
+const _kBrandLogoAsset = 'assets/brand_logo.png';
 const _kDefaultLogoAsset = 'assets/logo.png';
 const _kLightLogoAsset = 'assets/logo_light.png';
 const _kDarkLogoAsset = 'assets/logo_dark.png';
 
 List<String> _logoAssetCandidatesForBrightness(Brightness brightness) {
   return brightness == Brightness.dark
-      ? [_kDarkLogoAsset, _kDefaultLogoAsset]
-      : [_kLightLogoAsset, _kDefaultLogoAsset];
+      ? [_kBrandLogoAsset, _kDarkLogoAsset, _kDefaultLogoAsset]
+      : [_kBrandLogoAsset, _kLightLogoAsset, _kDefaultLogoAsset];
 }
 
 Future<String?> _resolveLogoAsset(Brightness brightness) async {

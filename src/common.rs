@@ -1005,6 +1005,22 @@ pub fn get_app_name() -> String {
 }
 
 #[inline]
+pub fn get_display_app_name() -> String {
+    match option_env!("REMOTESUPPORT_DISPLAY_NAME") {
+        Some(name) if !name.is_empty() => name.to_string(),
+        _ => get_app_name(),
+    }
+}
+
+#[inline]
+pub fn get_data_app_dir() -> String {
+    match option_env!("REMOTESUPPORT_DATA_DIR") {
+        Some(name) if !name.is_empty() => name.to_string(),
+        _ => get_display_app_name(),
+    }
+}
+
+#[inline]
 pub fn is_rustdesk() -> bool {
     hbb_common::config::APP_NAME.read().unwrap().eq("RustDesk")
 }
