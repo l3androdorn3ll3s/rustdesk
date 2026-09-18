@@ -2441,7 +2441,7 @@ class _AboutState extends State<_About> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'IdealSecurity Remote Support\n\u00A9 ${DateTime.now().toString().substring(0, 4)} IdealSecurity\nBaseado em componentes open source do RustDesk.\nRustDesk \u00A9 Purslane Tech Pte. Ltd.\nComponentes RustDesk: GNU AGPL v3.\n$license',
+                            'IdealSecurity Remote Support\n\u00A9 ${DateTime.now().toString().substring(0, 4)} IdealSecurity\n\nBy Leandro Dornelles\nDelta Inteligência Empresarial\n\nBaseado em componentes open source do RustDesk.\nRustDesk \u00A9 Purslane Tech Pte. Ltd.\nComponentes RustDesk: GNU AGPL v3.\n$license',
                             style: const TextStyle(color: Colors.white),
                           ),
                         ],

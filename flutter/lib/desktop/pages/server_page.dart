@@ -447,8 +447,8 @@ class _CmHeaderState extends State<_CmHeader>
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
           colors: [
-            Color(0xff00bfe1),
-            Color(0xff0071ff),
+            MyTheme.brandDark,
+            Color(0xFFB97C10),
           ],
         ),
       ),
@@ -582,16 +582,19 @@ class _CmHeaderState extends State<_CmHeader>
       width: 70,
       height: 70,
       alignment: Alignment.center,
+      padding: const EdgeInsets.all(10.0),
       decoration: BoxDecoration(
-        color: str2color(client.name),
+        color: MyTheme.brandDark,
         borderRadius: BorderRadius.circular(15.0),
+        border: Border.all(color: MyTheme.accent, width: 1.0),
       ),
-      child: Text(
-        client.name.isNotEmpty ? client.name[0] : '?',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-          fontSize: 55,
+      child: Image.asset(
+        'assets/icon.png',
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => Icon(
+          Icons.support_agent_rounded,
+          color: MyTheme.accent,
+          size: 42,
         ),
       ),
     );
@@ -995,7 +998,7 @@ class _CmControlPanel extends StatelessWidget {
         Offstage(
           offstage: !client.fromSwitch,
           child: buildButton(context,
-              color: Colors.purple,
+              color: MyTheme.accent,
               onClick: () => handleSwitchBack(context),
               icon: Icon(Icons.reply, color: Colors.white),
               text: "Switch Sides",
