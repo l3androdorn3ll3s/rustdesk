@@ -93,6 +93,22 @@ lazy_static::lazy_static! {
 #[cfg(target_os = "windows")]
 const TERMINAL_OS_LOGIN_FAILED_MSG: &str = "Incorrect username or password.";
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn set_session_block_input(block: bool) -> (bool, String) {
+    #[cfg(target_os = "windows")]
+    {
+        return match privacy_mode::set_local_input_block(block) {
+            Ok(()) => (true, String::new()),
+            Err(e) => (false, e.to_string()),
+        };
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        crate::platform::block_input(block)
+    }
+}
+
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
@@ -1193,35 +1209,41 @@ impl Connection {
                         handle_pointer(&msg, id);
                     }
                     MessageInput::BlockOn => {
-                        let (ok, msg) = crate::platform::block_input(true);
-                        if ok {
-                            block_input_mode = true;
-                        } else {
-                            Self::send_block_input_error(
-                                &tx,
-                                back_notification::BlockInputState::BlkOnFailed,
-                                msg,
-                            );
+                        if !block_input_mode {
+                            let (ok, msg) = set_session_block_input(true);
+                            if ok {
+                                block_input_mode = true;
+                            } else {
+                                Self::send_block_input_error(
+                                    &tx,
+                                    back_notification::BlockInputState::BlkOnFailed,
+                                    msg,
+                                );
+                            }
                         }
                     }
                     MessageInput::BlockOff => {
-                        let (ok, msg) = crate::platform::block_input(false);
-                        if ok {
-                            block_input_mode = false;
-                        } else {
-                            Self::send_block_input_error(
-                                &tx,
-                                back_notification::BlockInputState::BlkOffFailed,
-                                msg,
-                            );
+                        if block_input_mode {
+                            let (ok, msg) = set_session_block_input(false);
+                            if ok {
+                                block_input_mode = false;
+                            } else {
+                                Self::send_block_input_error(
+                                    &tx,
+                                    back_notification::BlockInputState::BlkOffFailed,
+                                    msg,
+                                );
+                            }
                         }
                     }
                     #[cfg(all(feature = "flutter", feature = "plugin_framework"))]
                     #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     MessageInput::BlockOnPlugin(_peer) => {
-                        let (ok, _msg) = crate::platform::block_input(true);
-                        if ok {
-                            block_input_mode = true;
+                        if !block_input_mode {
+                            let (ok, _msg) = set_session_block_input(true);
+                            if ok {
+                                block_input_mode = true;
+                            }
                         }
                         let _r = PLUGIN_BLOCK_INPUT_TX_RX
                             .0
@@ -1232,9 +1254,11 @@ impl Connection {
                     #[cfg(all(feature = "flutter", feature = "plugin_framework"))]
                     #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     MessageInput::BlockOffPlugin(_peer) => {
-                        let (ok, _msg) = crate::platform::block_input(false);
-                        if ok {
-                            block_input_mode = false;
+                        if block_input_mode {
+                            let (ok, _msg) = set_session_block_input(false);
+                            if ok {
+                                block_input_mode = false;
+                            }
                         }
                         let _r = PLUGIN_BLOCK_INPUT_TX_RX
                             .0
@@ -1244,15 +1268,18 @@ impl Connection {
                     }
                 },
                 Err(err) => {
-                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    #[cfg(not(target_os = "windows"))]
                     if block_input_mode {
-                        let _ = crate::platform::block_input(true);
+                        let _ = set_session_block_input(true);
                     }
                     if std_mpsc::RecvTimeoutError::Disconnected == err {
                         break;
                     }
                 }
             }
+        }
+        if block_input_mode {
+            let _ = set_session_block_input(false);
         }
         #[cfg(target_os = "linux")]
         clear_remapped_keycode();

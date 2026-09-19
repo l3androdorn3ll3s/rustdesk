@@ -2,6 +2,7 @@ use hbb_common::{allow_err, bail, lazy_static, log, ResultType};
 use std::{
     io::Error,
     sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc::{channel, Sender},
         Mutex,
     },
@@ -24,6 +25,9 @@ const WM_USER_EXIT_HOOK: u32 = WM_USER + 1;
 lazy_static::lazy_static! {
     static ref CUR_HOOK_THREAD_ID: Mutex<DWORD> = Mutex::new(0);
 }
+
+static PRIVACY_INPUT_HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
+static LOCAL_INPUT_BLOCK_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 fn do_hook(tx: Sender<String>) -> ResultType<(HHOOK, HHOOK)> {
     let invalid_ret = (0 as HHOOK, 0 as HHOOK);
@@ -97,7 +101,11 @@ fn do_hook(tx: Sender<String>) -> ResultType<(HHOOK, HHOOK)> {
     }
 }
 
-pub fn hook() -> ResultType<()> {
+fn start_hook() -> ResultType<()> {
+    if *CUR_HOOK_THREAD_ID.lock().unwrap() != 0 {
+        return Ok(());
+    }
+
     let (tx, rx) = channel();
     std::thread::spawn(move || {
         let hook_keyboard;
@@ -172,7 +180,13 @@ pub fn hook() -> ResultType<()> {
     }
 }
 
-pub fn unhook() -> ResultType<()> {
+fn stop_hook_if_unused() -> ResultType<()> {
+    if PRIVACY_INPUT_HOOK_ACTIVE.load(Ordering::SeqCst)
+        || LOCAL_INPUT_BLOCK_COUNT.load(Ordering::SeqCst) > 0
+    {
+        return Ok(());
+    }
+
     unsafe {
         let cur_hook_thread_id = CUR_HOOK_THREAD_ID.lock().unwrap();
         if *cur_hook_thread_id != 0 {
@@ -185,6 +199,47 @@ pub fn unhook() -> ResultType<()> {
         }
     }
     Ok(())
+}
+
+pub fn hook() -> ResultType<()> {
+    PRIVACY_INPUT_HOOK_ACTIVE.store(true, Ordering::SeqCst);
+    if let Err(e) = start_hook() {
+        PRIVACY_INPUT_HOOK_ACTIVE.store(false, Ordering::SeqCst);
+        return Err(e);
+    }
+    Ok(())
+}
+
+pub fn unhook() -> ResultType<()> {
+    PRIVACY_INPUT_HOOK_ACTIVE.store(false, Ordering::SeqCst);
+    stop_hook_if_unused()
+}
+
+pub fn set_local_input_block(block: bool) -> ResultType<()> {
+    if block {
+        let previous = LOCAL_INPUT_BLOCK_COUNT.fetch_add(1, Ordering::SeqCst);
+        if previous == 0 {
+            if let Err(e) = start_hook() {
+                LOCAL_INPUT_BLOCK_COUNT.fetch_sub(1, Ordering::SeqCst);
+                return Err(e);
+            }
+        }
+        Ok(())
+    } else {
+        let mut current = LOCAL_INPUT_BLOCK_COUNT.load(Ordering::SeqCst);
+        while current > 0 {
+            match LOCAL_INPUT_BLOCK_COUNT.compare_exchange(
+                current,
+                current - 1,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => break,
+                Err(actual) => current = actual,
+            }
+        }
+        stop_hook_if_unused()
+    }
 }
 
 #[no_mangle]
@@ -204,6 +259,10 @@ pub extern "system" fn privacy_mode_hook_keyboard(
 
     unsafe {
         if (*ks).dwExtraInfo != enigo::ENIGO_INPUT_EXTRA_VALUE {
+            if LOCAL_INPUT_BLOCK_COUNT.load(Ordering::SeqCst) > 0 {
+                return 1;
+            }
+
             // Disable alt key. Alt + Tab will switch windows.
             if (*ks).flags & LLKHF_ALTDOWN == LLKHF_ALTDOWN {
                 return 1;
@@ -255,7 +314,7 @@ pub extern "system" fn privacy_mode_hook_mouse(
         }
     }
 
-    let ms = l_param as PMOUSEHOOKSTRUCT;
+    let ms = l_param as PMSLLHOOKSTRUCT;
     unsafe {
         if (*ms).dwExtraInfo != enigo::ENIGO_INPUT_EXTRA_VALUE {
             return 1;

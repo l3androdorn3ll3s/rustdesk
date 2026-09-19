@@ -18,6 +18,11 @@ use std::{
 pub mod win_exclude_from_capture;
 #[cfg(windows)]
 mod win_input;
+
+#[cfg(windows)]
+pub fn set_local_input_block(block: bool) -> ResultType<()> {
+    win_input::set_local_input_block(block)
+}
 #[cfg(windows)]
 pub mod win_mag;
 #[cfg(windows)]
