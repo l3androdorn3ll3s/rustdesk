@@ -1552,8 +1552,24 @@ fn get_after_install(
     ", create_service=get_create_service(&exe))
 }
 
-pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> ResultType<()> {
-    let uninstall_str = get_uninstall(false, false);
+fn install_me_impl(options: &str, path: String, silent: bool, debug: bool, headless_agent: bool) -> ResultType<()> {
+    let uninstall_str = if headless_agent {
+        let (existing_subkey, existing_path, existing_start_menu, _) = get_install_info();
+        format!(
+            "
+{before_uninstall}
+reg delete {existing_subkey} /f
+if exist \"{existing_path}\" rd /s /q \"{existing_path}\"
+if exist \"{existing_start_menu}\" rd /s /q \"{existing_start_menu}\"
+if exist \"%PUBLIC%\\Desktop\\{app_name}.lnk\" del /f /q \"%PUBLIC%\\Desktop\\{app_name}.lnk\"
+if exist \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{app_name} Tray.lnk\" del /f /q \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{app_name} Tray.lnk\"
+",
+            before_uninstall = get_before_uninstall(false),
+            app_name = crate::get_app_name(),
+        )
+    } else {
+        get_uninstall(false, false)
+    };
     let mut path = path.trim_end_matches('\\').to_owned();
     let (subkey, _path, start_menu, exe) = get_default_install_info();
     let mut exe = exe;
@@ -1677,7 +1693,7 @@ if exist \"{tmp_path}\\{app_name} Tray.lnk\" del /f /q \"{tmp_path}\\{app_name} 
         Config::set_option("api-server".into(), lic.api);
     }
 
-    let tray_shortcuts = if config::is_outgoing_only() {
+    let tray_shortcuts = if headless_agent || config::is_outgoing_only() {
         "".to_owned()
     } else {
         format!("
@@ -1686,7 +1702,9 @@ copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\
 ")
     };
 
-    let install_remote_printer = if install_printer {
+    let install_remote_printer = if headless_agent {
+        "".to_owned()
+    } else if install_printer {
         // No need to use `|| true` here.
         // The script will not exit even if `--install-remote-printer` panics.
         format!("\"{}\" --install-remote-printer", &src_exe)
@@ -1745,8 +1763,18 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
         import_config = get_import_config(&exe),
     );
     run_cmds(cmds, debug, "install")?;
-    run_after_run_cmds(silent);
+    if !headless_agent {
+        run_after_run_cmds(silent);
+    }
     Ok(())
+}
+
+pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> ResultType<()> {
+    install_me_impl(options, path, silent, debug, false)
+}
+
+pub fn install_agent() -> ResultType<()> {
+    install_me_impl("", "".to_owned(), true, false, true)
 }
 
 pub fn run_after_install() -> ResultType<()> {
@@ -3215,7 +3243,6 @@ if exist \"{tray_shortcut}\" del /f /q \"{tray_shortcut}\"
     run_after_run_cmds(false);
     std::process::exit(0);
 }
-
 /// Calculate the total size of a directory in KB
 /// Does not follow symlinks to prevent directory traversal attacks.
 fn get_directory_size_kb(path: &str) -> u64 {

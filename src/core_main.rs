@@ -377,6 +377,15 @@ pub fn core_main() -> Option<Vec<String>> {
                 crate::tray::start_tray();
             }
             return None;
+        } else if args[0] == "--install-agent" {
+            log::info!("start --install-agent");
+            #[cfg(windows)]
+            if let Err(err) = crate::platform::install_agent() {
+                log::error!("Failed to install Agent: {err}");
+            }
+            #[cfg(not(windows))]
+            log::error!("--install-agent is currently supported on Windows only");
+            return None;
         } else if args[0] == "--install-service" {
             log::info!("start --install-service");
             crate::platform::install_service();
