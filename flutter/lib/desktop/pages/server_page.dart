@@ -732,7 +732,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
                           });
                         },
                         translate('Enable keyboard/mouse'),
-                        canModify: canModifyPermission,
+                        canModify: false,
                       ),
                       buildPermissionIcon(
                         client.clipboard,
