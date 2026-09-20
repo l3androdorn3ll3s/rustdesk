@@ -1796,7 +1796,13 @@ pub fn install_agent() -> ResultType<()> {
         "allow-remote-cm-modification".into(),
         "Y".into(),
     );
-    install_me_impl("", "".to_owned(), true, false, true)
+
+    install_me_impl("", "".to_owned(), true, false, true)?;
+
+    crate::ipc::set_option("approve-mode", "password");
+    crate::ipc::set_option("verification-method", "use-permanent-password");
+
+    Ok(())
 }
 
 pub fn run_after_install() -> ResultType<()> {
