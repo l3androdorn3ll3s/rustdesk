@@ -372,6 +372,17 @@ pub fn core_main() -> Option<Vec<String>> {
                 std::fs::remove_file(&args[1]).ok();
                 return None;
             }
+        } else if args[0] == "--agent-tray" {
+            log::info!("start --agent-tray");
+            #[cfg(windows)]
+            {
+                if !crate::check_process("--agent-tray", true) {
+                    crate::tray::start_agent_tray();
+                }
+            }
+            #[cfg(not(windows))]
+            log::error!("--agent-tray is currently supported on Windows only");
+            return None;
         } else if args[0] == "--tray" {
             if !crate::check_process("--tray", true) {
                 crate::tray::start_tray();

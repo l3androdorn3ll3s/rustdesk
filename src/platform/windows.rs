@@ -1636,6 +1636,7 @@ oLink.Save
     .unwrap_or("")
     .to_owned();
     let tray_shortcut = get_tray_shortcut(&path, &exe, &cur_exe, &tmp_path)?;
+    let agent_tray_shortcut = get_agent_tray_shortcut(&path, &exe, &cur_exe, &tmp_path)?;
     let mut reg_value_desktop_shortcuts = "0".to_owned();
     let mut reg_value_start_menu_shortcuts = "0".to_owned();
     let mut reg_value_printer = "0".to_owned();
@@ -1679,6 +1680,8 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{start_menu}\\\"
 if exist \"{mk_shortcut}\" del /f /q \"{mk_shortcut}\"
 if exist \"{uninstall_shortcut}\" del /f /q \"{uninstall_shortcut}\"
 if exist \"{tray_shortcut}\" del /f /q \"{tray_shortcut}\"
+if exist \"{agent_tray_shortcut}\" del /f /q \"{agent_tray_shortcut}\"
+if exist \"{tmp_path}\\{app_name} Agent.lnk\" del /f /q \"{tmp_path}\\{app_name} Agent.lnk\"
 if exist \"{tmp_path}\\{app_name}.lnk\" del /f /q \"{tmp_path}\\{app_name}.lnk\"
 if exist \"{tmp_path}\\Uninstall {app_name}.lnk\" del /f /q \"{tmp_path}\\Uninstall {app_name}.lnk\"
 if exist \"{tmp_path}\\{app_name} Tray.lnk\" del /f /q \"{tmp_path}\\{app_name} Tray.lnk\"
@@ -1693,7 +1696,12 @@ if exist \"{tmp_path}\\{app_name} Tray.lnk\" del /f /q \"{tmp_path}\\{app_name} 
         Config::set_option("api-server".into(), lic.api);
     }
 
-    let tray_shortcuts = if headless_agent || config::is_outgoing_only() {
+    let tray_shortcuts = if headless_agent {
+        format!("
+cscript \"{agent_tray_shortcut}\"
+copy /Y \"{tmp_path}\\{app_name} Agent.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
+")
+    } else if config::is_outgoing_only() {
         "".to_owned()
     } else {
         format!("
@@ -1763,17 +1771,31 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
         import_config = get_import_config(&exe),
     );
     run_cmds(cmds, debug, "install")?;
-    if !headless_agent {
+    if headless_agent {
+        allow_err!(std::process::Command::new(&exe).arg("--agent-tray").spawn());
+    } else {
         run_after_run_cmds(silent);
     }
     Ok(())
 }
 
 pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> ResultType<()> {
+    if Config::get_option("agent-mode") == "Y" {
+        crate::ui_interface::set_local_option(
+            "allow-remote-cm-modification".into(),
+            "".into(),
+        );
+    }
+    Config::set_option("agent-mode".into(), "".into());
     install_me_impl(options, path, silent, debug, false)
 }
 
 pub fn install_agent() -> ResultType<()> {
+    Config::set_option("agent-mode".into(), "Y".into());
+    crate::ui_interface::set_local_option(
+        "allow-remote-cm-modification".into(),
+        "Y".into(),
+    );
     install_me_impl("", "".to_owned(), true, false, true)
 }
 
@@ -3704,6 +3726,35 @@ oLink.Save
         ),
         "vbs",
         "tray_shortcut",
+    )?
+    .to_str()
+    .unwrap_or("")
+    .to_owned())
+}
+
+pub fn get_agent_tray_shortcut(
+    install_dir: &str,
+    exe: &str,
+    icon_source_exe: &str,
+    tmp_path: &str,
+) -> ResultType<String> {
+    let shortcut_icon_location = get_shortcut_icon_location(install_dir, icon_source_exe);
+    Ok(write_cmds(
+        format!(
+            "
+Set oWS = WScript.CreateObject(\"WScript.Shell\")
+sLinkFile = \"{tmp_path}\\{app_name} Agent.lnk\"
+
+Set oLink = oWS.CreateShortcut(sLinkFile)
+    oLink.TargetPath = \"{exe}\"
+    oLink.Arguments = \"--agent-tray\"
+    {shortcut_icon_location}
+oLink.Save
+        ",
+            app_name = crate::get_app_name(),
+        ),
+        "vbs",
+        "agent_tray_shortcut",
     )?
     .to_str()
     .unwrap_or("")

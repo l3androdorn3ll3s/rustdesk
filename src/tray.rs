@@ -22,6 +22,158 @@ pub fn start_tray() {
     allow_err!(make_tray());
 }
 
+#[cfg(windows)]
+pub fn start_agent_tray() {
+    allow_err!(make_agent_tray());
+}
+
+#[cfg(windows)]
+fn make_agent_tray() -> hbb_common::ResultType<()> {
+    use hbb_common::anyhow::Context;
+    use tao::event_loop::{ControlFlow, EventLoopBuilder};
+    use tray_icon::{
+        menu::{Menu, MenuEvent, MenuItem},
+        TrayIcon, TrayIconBuilder,
+    };
+
+    const AGENT_NAME: &str = "IdealSecurity Remote Support";
+
+    let icon = include_bytes!("../res/tray-icon.ico");
+    let (icon_rgba, icon_width, icon_height) = {
+        let image = load_icon_from_asset()
+            .unwrap_or(image::load_from_memory(icon).context("Failed to open icon path")?)
+            .into_rgba8();
+        let (width, height) = image.dimensions();
+        let rgba = image.into_raw();
+        (rgba, width, height)
+    };
+
+    let icon = tray_icon::Icon::from_rgba(icon_rgba, icon_width, icon_height)
+        .context("Failed to open icon")?;
+
+    let mut event_loop = EventLoopBuilder::new().build();
+
+    let tray_menu = Menu::new();
+    let title_i = MenuItem::new(AGENT_NAME, false, None);
+    let status_i = MenuItem::new("Status: Connecting...", false, None);
+    let id_i = MenuItem::new("ID: ...", false, None);
+    let copy_i = MenuItem::new("Copiar ID", true, None);
+
+    tray_menu
+        .append_items(&[&title_i, &status_i, &id_i, &copy_i])
+        .ok();
+
+    let tooltip = |online: bool, id: &str| {
+        format!(
+            "{AGENT_NAME}\nStatus: {}\nID: {}",
+            if online { "Online" } else { "Offline" },
+            if id.is_empty() { "..." } else { id }
+        )
+    };
+
+    let mut tray_icon: Arc<Mutex<Option<TrayIcon>>> = Default::default();
+    let menu_channel = MenuEvent::receiver();
+    let (ipc_sender, ipc_receiver) = std::sync::mpsc::channel::<Data>();
+
+    std::thread::spawn(move || {
+        start_query_agent_status(ipc_sender);
+    });
+
+    let mut online = false;
+    let mut current_id = String::new();
+
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::WaitUntil(
+            std::time::Instant::now() + std::time::Duration::from_millis(100),
+        );
+
+        if let tao::event::Event::NewEvents(tao::event::StartCause::Init) = event {
+            let builder = TrayIconBuilder::new()
+                .with_menu(Box::new(tray_menu.clone()))
+                .with_tooltip(tooltip(online, &current_id))
+                .with_icon(icon.clone())
+                .with_menu_on_left_click(false);
+
+            match builder.build() {
+                Ok(tray) => tray_icon = Arc::new(Mutex::new(Some(tray))),
+                Err(err) => log::error!("Failed to create agent tray icon: {}", err),
+            }
+        }
+
+        if let Ok(event) = menu_channel.try_recv() {
+            if event.id == copy_i.id() && !current_id.is_empty() {
+                if let Ok(mut ctx) = arboard::Clipboard::new() {
+                    ctx.set_text(current_id.clone()).ok();
+                }
+            }
+        }
+
+        if let Ok(data) = ipc_receiver.try_recv() {
+            match data {
+                Data::OnlineStatus(Some((status, _))) => {
+                    online = status > 0;
+                    status_i.set_text(if online {
+                        "Status: Online"
+                    } else {
+                        "Status: Offline"
+                    });
+                }
+                Data::Config((name, Some(value))) if name == "id" => {
+                    current_id = value;
+                    id_i.set_text(format!("ID: {}", current_id));
+                }
+                _ => {}
+            }
+
+            tray_icon
+                .lock()
+                .unwrap()
+                .as_mut()
+                .map(|t| t.set_tooltip(Some(tooltip(online, &current_id))));
+        }
+    });
+}
+
+#[cfg(windows)]
+#[tokio::main(flavor = "current_thread")]
+async fn start_query_agent_status(sender: std::sync::mpsc::Sender<Data>) {
+    loop {
+        if let Ok(mut c) = crate::ipc::connect(1000, "").await {
+            let mut timer =
+                crate::rustdesk_interval(tokio::time::interval(Duration::from_secs(1)));
+
+            loop {
+                tokio::select! {
+                    res = c.next() => {
+                        match res {
+                            Err(err) => {
+                                log::error!("agent tray ipc connection closed: {}", err);
+                                break;
+                            }
+                            Ok(Some(Data::OnlineStatus(Some((status, confirmed))))) => {
+                                sender
+                                    .send(Data::OnlineStatus(Some((status, confirmed))))
+                                    .ok();
+                            }
+                            Ok(Some(Data::Config((name, Some(value))))) => {
+                                sender.send(Data::Config((name, Some(value)))).ok();
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    _ = timer.tick() => {
+                        c.send(&Data::OnlineStatus(None)).await.ok();
+                        c.send(&Data::Config(("id".to_owned(), None))).await.ok();
+                    }
+                }
+            }
+        }
+
+        hbb_common::sleep(1.).await;
+    }
+}
+
 fn make_tray() -> hbb_common::ResultType<()> {
     // https://github.com/tauri-apps/tray-icon/blob/dev/examples/tao.rs
     use hbb_common::anyhow::Context;
