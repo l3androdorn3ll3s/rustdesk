@@ -67,7 +67,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
   Widget build(BuildContext context) {
     final isIncomingOnly = bind.isIncomingOnly();
     startServiceWidget() => Offstage(
-          offstage: !_svcStopped.value,
+          offstage: !_svcStopped.value || kIdealSecurityTechnicianEdition,
           child: InkWell(
                   onTap: () async {
                     await start_service(true);
@@ -118,7 +118,9 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(4),
                 color: _svcStopped.value ||
-                        stateGlobal.svcStatus.value == SvcStatus.connecting
+                        stateGlobal.svcStatus.value == SvcStatus.connecting ||
+                        (kIdealSecurityTechnicianEdition &&
+                            stateGlobal.svcStatus.value == SvcStatus.notReady)
                     ? kColorWarn
                     : (stateGlobal.svcStatus.value == SvcStatus.ready
                         ? Color.fromARGB(255, 50, 190, 166)
@@ -155,14 +157,18 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
 
   _buildConnStatusMsg() {
     widget.onSvcStatusChanged?.call();
+    final localServiceUnavailable =
+        _svcStopped.value || stateGlobal.svcStatus.value == SvcStatus.notReady;
     return Text(
-      _svcStopped.value
-          ? translate("Service is not running")
-          : stateGlobal.svcStatus.value == SvcStatus.connecting
-              ? translate("connecting_status")
-              : stateGlobal.svcStatus.value == SvcStatus.notReady
-                  ? translate("not_ready_status")
-                  : translate('Ready'),
+      kIdealSecurityTechnicianEdition && localServiceUnavailable
+          ? translate("technician_local_service_unavailable")
+          : _svcStopped.value
+              ? translate("Service is not running")
+              : stateGlobal.svcStatus.value == SvcStatus.connecting
+                  ? translate("connecting_status")
+                  : stateGlobal.svcStatus.value == SvcStatus.notReady
+                      ? translate("not_ready_status")
+                      : translate('Ready'),
       style: TextStyle(fontSize: em),
     );
   }
@@ -319,8 +325,10 @@ class _ConnectionPageState extends State<ConnectionPage>
             Expanded(child: PeerTabPage()),
           ],
         ).paddingOnly(left: 12.0)),
-        if (!isOutgoingOnly) const Divider(height: 1),
-        if (!isOutgoingOnly) OnlineStatusWidget()
+        if (!isOutgoingOnly && !kIdealSecurityTechnicianEdition)
+          const Divider(height: 1),
+        if (!isOutgoingOnly && !kIdealSecurityTechnicianEdition)
+          OnlineStatusWidget()
       ],
     );
   }

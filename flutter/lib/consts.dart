@@ -4,6 +4,9 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 
+// This branch builds the IdealSecurity technician/operator edition.
+const bool kIdealSecurityTechnicianEdition = true;
+
 const int kMaxVirtualDisplayCount = 4;
 const int kAllVirtualDisplay = -1;
 
