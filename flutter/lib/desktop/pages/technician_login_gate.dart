@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
 class TechnicianLoginGate extends StatefulWidget {
   const TechnicianLoginGate({
@@ -102,8 +103,10 @@ class _TechnicianLoginGateState extends State<TechnicianLoginGate> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
+      body: Stack(
+        children: [
+          Center(
+            child: SingleChildScrollView(
           padding: const EdgeInsets.all(32),
           child: ConstrainedBox(
             constraints: const BoxConstraints(
@@ -213,8 +216,24 @@ class _TechnicianLoginGateState extends State<TechnicianLoginGate> {
                 ),
               ),
             ),
+              ),
+            ),
           ),
-        ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Tooltip(
+              message: 'Fechar',
+              child: IconButton(
+                onPressed: () async {
+                  await windowManager.setPreventClose(false);
+                  await windowManager.close();
+                },
+                icon: const Icon(Icons.close),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
