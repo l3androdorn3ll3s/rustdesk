@@ -193,8 +193,7 @@ class _TechnicianLoginGateState extends State<TechnicianLoginGate> {
                           ],
                           const SizedBox(height: 20),
                           FilledButton(
-                            onPressed:
-                                _authenticating ? null : _authenticate,
+                            onPressed: _authenticating ? null : _authenticate,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 vertical: 11,

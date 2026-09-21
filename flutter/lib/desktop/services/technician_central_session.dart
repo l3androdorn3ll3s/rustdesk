@@ -6,8 +6,7 @@ import 'package:flutter/foundation.dart';
 class TechnicianCentralSession extends ChangeNotifier {
   TechnicianCentralSession._();
 
-  static final TechnicianCentralSession instance =
-      TechnicianCentralSession._();
+  static final TechnicianCentralSession instance = TechnicianCentralSession._();
 
   static const String _configuredApiBaseUrl =
       String.fromEnvironment('REMOTE_SUPPORT_API_BASE_URL');
@@ -19,9 +18,7 @@ class TechnicianCentralSession extends ChangeNotifier {
   TechnicianCentralIdentity? get identity => _identity;
 
   bool get hasSession =>
-      _identity != null &&
-      _sessionToken != null &&
-      _sessionToken!.isNotEmpty;
+      _identity != null && _sessionToken != null && _sessionToken!.isNotEmpty;
 
   Future<TechnicianCentralLoginResult> login(
     String username,
@@ -107,9 +104,7 @@ class TechnicianCentralSession extends ChangeNotifier {
         );
       }
 
-      final roles = rolesValue
-          .whereType<String>()
-          .toList(growable: false);
+      final roles = rolesValue.whereType<String>().toList(growable: false);
 
       final identity = TechnicianCentralIdentity(
         id: id,
