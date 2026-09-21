@@ -220,6 +220,17 @@ class _TechnicianLoginGateState extends State<TechnicianLoginGate> {
             ),
           ),
           Positioned(
+            top: 0,
+            left: 0,
+            right: 56,
+            height: 48,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onPanStart: (_) => windowManager.startDragging(),
+              child: const SizedBox.expand(),
+            ),
+          ),
+          Positioned(
             top: 8,
             right: 8,
             child: Tooltip(
