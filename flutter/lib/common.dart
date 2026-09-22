@@ -35,6 +35,7 @@ import 'mobile/pages/remote_page.dart';
 import 'mobile/pages/view_camera_page.dart';
 import 'mobile/pages/terminal_page.dart';
 import 'desktop/pages/remote_page.dart' as desktop_remote;
+import 'desktop/services/technician_central_session.dart';
 import 'desktop/pages/file_manager_page.dart' as desktop_file_manager;
 import 'desktop/pages/view_camera_page.dart' as desktop_view_camera;
 import 'package:flutter_hbb/desktop/widgets/remote_toolbar.dart';
@@ -2594,6 +2595,70 @@ connect(BuildContext context, String id,
     String? connToken,
     bool? isSharedPassword}) async {
   if (id == '') return;
+
+  // IdealSecurity Technician invariant:
+  // every outbound connection path (ID field, peer cards, menus, deep links)
+  // must pass through the central session/ACL/credential resolver.
+  //
+  // The main ConnectionPage already resolves before calling connect(). This
+  // fallback protects the other RustDesk entry points that call connect()
+  // directly. A Technician session must never fall back to the interactive
+  // RustDesk password dialog merely because a UI path bypassed ConnectionPage.
+  if (kIdealSecurityTechnicianEdition &&
+      (password == null || password.isEmpty)) {
+    final capability = isFileTransfer
+        ? 'file_transfer'
+        : isViewCamera
+            ? 'view_camera'
+            : isTerminal
+                ? 'terminal'
+                : 'unattended';
+
+    final resolution =
+        await TechnicianCentralSession.instance.resolveAgentConnection(
+      deviceId: id,
+      capability: capability,
+    );
+
+    final resolvedConnection = resolution.connection;
+
+    if (!resolution.succeeded || resolvedConnection == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                resolution.message ??
+                    'Não foi possível liberar a conexão com este equipamento.',
+              ),
+            ),
+          );
+      }
+      return;
+    }
+
+    id = resolvedConnection.deviceId;
+    password = resolvedConnection.connectionPassword;
+    isSharedPassword = false;
+  }
+
+  if (kIdealSecurityTechnicianEdition &&
+      (password == null || password.isEmpty)) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'A conexão foi bloqueada porque a credencial central não foi resolvida.',
+            ),
+          ),
+        );
+    }
+    return;
+  }
+
   if (!isDesktop || desktopType == DesktopType.main) {
     try {
       if (Get.isRegistered<IDTextEditingController>()) {
