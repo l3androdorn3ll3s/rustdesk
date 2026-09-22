@@ -28,7 +28,7 @@ class TechnicianCentralSession extends ChangeNotifier {
 
     if (baseUri == null) {
       return const TechnicianCentralLoginResult.failure(
-        'O servidor central não está configurado com uma URL HTTPS válida.',
+        'O servidor central não está configurado com uma URL segura válida.',
       );
     }
 
@@ -149,7 +149,7 @@ class TechnicianCentralSession extends ChangeNotifier {
 
     if (baseUri == null) {
       return const TechnicianAgentConnectionResult.failure(
-        'O servidor central não está configurado com uma URL HTTPS válida.',
+        'O servidor central não está configurado com uma URL segura válida.',
       );
     }
 
@@ -268,14 +268,25 @@ class TechnicianCentralSession extends ChangeNotifier {
 
     final uri = Uri.tryParse(raw);
 
-    if (uri == null ||
-        uri.scheme.toLowerCase() != 'https' ||
-        uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty) {
+    if (uri == null || uri.host.isEmpty || uri.userInfo.isNotEmpty) {
       return null;
     }
 
-    return uri;
+    final scheme = uri.scheme.toLowerCase();
+
+    if (scheme == 'https') {
+      return uri;
+    }
+
+    if (scheme != 'http') {
+      return null;
+    }
+
+    final host = uri.host.toLowerCase();
+    final isLoopback =
+        host == '127.0.0.1' || host == 'localhost' || host == '::1';
+
+    return isLoopback ? uri : null;
   }
 
   void _clearSession() {
