@@ -212,7 +212,7 @@ class _TechnicianLoginGateState extends State<TechnicianLoginGate> {
                           const SizedBox(height: 14),
                           Text(
                             'A autenticação é realizada pelo servidor central '
-                            'IdealSecurity através de conexão HTTPS segura.',
+                            'IdealSecurity.',
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodySmall,
                           ),
