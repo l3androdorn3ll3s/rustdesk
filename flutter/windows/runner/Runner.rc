@@ -3,6 +3,23 @@
 #pragma code_page(65001)
 #include "resource.h"
 
+#ifndef REMOTE_SUPPORT_BRAND_COMPANY_NAME
+#define REMOTE_SUPPORT_BRAND_COMPANY_NAME "IdealSecurity"
+#endif
+
+#ifndef REMOTE_SUPPORT_BRAND_PRODUCT_NAME
+#define REMOTE_SUPPORT_BRAND_PRODUCT_NAME "IdealSecurity Remote Support"
+#endif
+
+#ifndef REMOTE_SUPPORT_BRAND_FILE_DESCRIPTION
+#define REMOTE_SUPPORT_BRAND_FILE_DESCRIPTION "IdealSecurity Remote Support"
+#endif
+
+#ifndef REMOTE_SUPPORT_BRAND_WINDOWS_ICON
+#define REMOTE_SUPPORT_BRAND_WINDOWS_ICON "resources\\app_icon.ico"
+#endif
+
+
 #define APSTUDIO_READONLY_SYMBOLS
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -52,7 +69,7 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_APP_ICON            ICON                    "resources\\app_icon.ico"
+IDI_APP_ICON            ICON                    REMOTE_SUPPORT_BRAND_WINDOWS_ICON
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -89,13 +106,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "IdealSecurity" "\0"
-            VALUE "FileDescription", "IdealSecurity Remote Support" "\0"
+            VALUE "CompanyName", REMOTE_SUPPORT_BRAND_COMPANY_NAME "\0"
+            VALUE "FileDescription", REMOTE_SUPPORT_BRAND_FILE_DESCRIPTION "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "rustdesk" "\0"
             VALUE "LegalCopyright", "Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved." "\0"
             VALUE "OriginalFilename", "rustdesk.exe" "\0"
-            VALUE "ProductName", "IdealSecurity Remote Support" "\0"
+            VALUE "ProductName", REMOTE_SUPPORT_BRAND_PRODUCT_NAME "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
