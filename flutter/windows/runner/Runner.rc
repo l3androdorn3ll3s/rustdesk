@@ -2,6 +2,7 @@
 //
 #pragma code_page(65001)
 #include "resource.h"
+#include "remote_support_brand_config.h"
 
 #ifndef REMOTE_SUPPORT_BRAND_COMPANY_NAME
 #define REMOTE_SUPPORT_BRAND_COMPANY_NAME "IdealSecurity"
