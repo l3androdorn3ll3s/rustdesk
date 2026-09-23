@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../brand/brand_profile.dart';
 import '../services/technician_central_session.dart';
 
 class TechnicianLoginGate extends StatefulWidget {
@@ -133,13 +134,13 @@ class _TechnicianLoginGateState extends State<TechnicianLoginGate> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Image.asset(
-                            'assets/brand_logo.png',
+                            RemoteSupportBrand.logoAsset,
                             height: 82,
                             fit: BoxFit.contain,
                           ),
                           const SizedBox(height: 18),
                           Text(
-                            'IdealSecurity Remote Support',
+                            RemoteSupportBrand.productName,
                             textAlign: TextAlign.center,
                             style: theme.textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w600,
@@ -147,7 +148,7 @@ class _TechnicianLoginGateState extends State<TechnicianLoginGate> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Acesso do técnico',
+                            RemoteSupportBrand.technicianSubtitle,
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodyMedium,
                           ),
@@ -211,8 +212,7 @@ class _TechnicianLoginGateState extends State<TechnicianLoginGate> {
                           ),
                           const SizedBox(height: 14),
                           Text(
-                            'A autenticação é realizada pelo servidor central '
-                            'IdealSecurity.',
+                            RemoteSupportBrand.centralAuthFooter,
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodySmall,
                           ),
