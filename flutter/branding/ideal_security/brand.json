@@ -11,5 +11,7 @@
   "primaryColor80": "0xAADC9919",
   "lightSidebarColor": "0xFFE8E1D5",
   "darkSidebarColor": "0xFF252117",
-  "borderAccentColor": "0xFFB97C10"
+  "borderAccentColor": "0xFFB97C10",
+  "fileDescription": "IdealSecurity Remote Support",
+  "windowsIcon": "windows/runner/resources/app_icon.ico"
 }
