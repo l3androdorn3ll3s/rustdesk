@@ -20,6 +20,7 @@ import '../../common/widgets/peer_tab_page.dart';
 import '../../common/widgets/autocomplete.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
+import '../services/technician_central_session.dart';
 
 class OnlineStatusWidget extends StatefulWidget {
   const OnlineStatusWidget({Key? key, this.onSvcStatusChanged})
@@ -335,15 +336,63 @@ class _ConnectionPageState extends State<ConnectionPage>
 
   /// Callback for the connect button.
   /// Connects to the selected peer.
-  void onConnect(
+  Future<void> onConnect(
       {bool isFileTransfer = false,
       bool isViewCamera = false,
-      bool isTerminal = false}) {
-    var id = _idController.id;
-    connect(context, id,
+      bool isTerminal = false}) async {
+    final id = _idController.id;
+
+    if (!kIdealSecurityTechnicianEdition) {
+      await connect(context, id,
+          isFileTransfer: isFileTransfer,
+          isViewCamera: isViewCamera,
+          isTerminal: isTerminal);
+      return;
+    }
+
+    if (id.trim().isEmpty) {
+      return;
+    }
+
+    final capability = isFileTransfer
+        ? 'file_transfer'
+        : isViewCamera
+            ? 'view_camera'
+            : isTerminal
+                ? 'terminal'
+                : 'unattended';
+
+    final resolution =
+        await TechnicianCentralSession.instance.resolveAgentConnection(
+      deviceId: id,
+      capability: capability,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    final connection = resolution.connection;
+
+    if (!resolution.succeeded || connection == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              resolution.message ??
+                  'Não foi possível liberar a conexão com este equipamento.',
+            ),
+          ),
+        );
+      return;
+    }
+
+    await connect(context, connection.deviceId,
         isFileTransfer: isFileTransfer,
         isViewCamera: isViewCamera,
-        isTerminal: isTerminal);
+        isTerminal: isTerminal,
+        password: connection.connectionPassword);
   }
 
   /// UI for the remote ID TextField.

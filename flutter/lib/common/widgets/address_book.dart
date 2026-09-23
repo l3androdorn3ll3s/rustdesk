@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:bot_toast/bot_toast.dart';
@@ -19,6 +20,7 @@ import 'package:get/get.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 
 import '../../common.dart';
+import '../../desktop/services/technician_central_session.dart';
 import 'dialog.dart';
 import 'login.dart';
 
@@ -35,42 +37,547 @@ class AddressBook extends StatefulWidget {
 }
 
 class _AddressBookState extends State<AddressBook> {
+  static const _centralOnlineEvent = 'callback_query_onlines';
+  static const _centralOnlineHandler = 'technician-central-directory';
+
   var menuPos = RelativeRect.fill;
+  Future<TechnicianAccessibleAgentsResult>? _centralDirectoryFuture;
+  final Map<String, bool?> _centralOnlineStates = {};
+  final Set<String> _centralAgentIds = {};
+  Timer? _centralOnlineTimer;
 
   @override
-  Widget build(BuildContext context) => Obx(() {
-        if (!gFFI.userModel.isLogin) {
-          return Center(
-              child: ElevatedButton(
-                  onPressed: loginDialog, child: Text(translate("Login"))));
-        } else if (gFFI.userModel.networkError.isNotEmpty) {
-          return netWorkErrorWidget();
-        } else {
-          return Column(
+  void initState() {
+    super.initState();
+
+    if (kIdealSecurityTechnicianEdition) {
+      TechnicianCentralSession.instance.addListener(
+        _onTechnicianCentralSessionChanged,
+      );
+      platformFFI.registerEventHandler(
+        _centralOnlineEvent,
+        _centralOnlineHandler,
+        (evt) async {
+          _onCentralOnlineState(evt);
+        },
+      );
+
+      if (TechnicianCentralSession.instance.hasSession) {
+        _centralDirectoryFuture = _loadCentralDirectory();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    if (kIdealSecurityTechnicianEdition) {
+      TechnicianCentralSession.instance.removeListener(
+        _onTechnicianCentralSessionChanged,
+      );
+      platformFFI.unregisterEventHandler(
+        _centralOnlineEvent,
+        _centralOnlineHandler,
+      );
+      _centralOnlineTimer?.cancel();
+    }
+
+    super.dispose();
+  }
+
+  void _onTechnicianCentralSessionChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      if (TechnicianCentralSession.instance.hasSession) {
+        _centralDirectoryFuture = _loadCentralDirectory();
+      } else {
+        _centralDirectoryFuture = null;
+        _centralOnlineTimer?.cancel();
+        _centralOnlineTimer = null;
+        _centralAgentIds.clear();
+        _centralOnlineStates.clear();
+      }
+    });
+  }
+
+  void _refreshCentralDirectory() {
+    setState(() {
+      _centralDirectoryFuture = _loadCentralDirectory();
+    });
+  }
+
+  Future<TechnicianAccessibleAgentsResult> _loadCentralDirectory() async {
+    final result =
+        await TechnicianCentralSession.instance.listAccessibleAgents();
+
+    if (result.succeeded) {
+      final nextIds = result.agents
+          .map((agent) => agent.deviceId)
+          .where((id) => id.isNotEmpty)
+          .toSet();
+
+      _centralAgentIds
+        ..clear()
+        ..addAll(nextIds);
+
+      _centralOnlineStates.removeWhere(
+        (id, _) => !nextIds.contains(id),
+      );
+
+      for (final id in nextIds) {
+        _centralOnlineStates.putIfAbsent(id, () => null);
+      }
+
+      _queryCentralOnlineStates();
+      _ensureCentralOnlineTimer();
+    }
+
+    return result;
+  }
+
+  void _ensureCentralOnlineTimer() {
+    _centralOnlineTimer ??= Timer.periodic(
+      const Duration(seconds: 10),
+      (_) {
+        if (TechnicianCentralSession.instance.hasSession) {
+          _queryCentralOnlineStates();
+        }
+      },
+    );
+  }
+
+  void _queryCentralOnlineStates() {
+    if (_centralAgentIds.isEmpty) {
+      return;
+    }
+
+    bind.queryOnlines(
+      ids: _centralAgentIds.toList(growable: false),
+    );
+  }
+
+  void _onCentralOnlineState(Map<String, dynamic> evt) {
+    if (!mounted || _centralAgentIds.isEmpty) {
+      return;
+    }
+
+    final onlines = (evt['onlines']?.toString() ?? '')
+        .split(',')
+        .where((id) => id.isNotEmpty);
+    final offlines = (evt['offlines']?.toString() ?? '')
+        .split(',')
+        .where((id) => id.isNotEmpty);
+
+    var changed = false;
+
+    for (final id in onlines) {
+      if (_centralAgentIds.contains(id) &&
+          _centralOnlineStates[id] != true) {
+        _centralOnlineStates[id] = true;
+        changed = true;
+      }
+    }
+
+    for (final id in offlines) {
+      if (_centralAgentIds.contains(id) &&
+          _centralOnlineStates[id] != false) {
+        _centralOnlineStates[id] = false;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (kIdealSecurityTechnicianEdition) {
+      return _buildTechnicianCentralDirectory();
+    }
+
+    return Obx(() {
+      if (!gFFI.userModel.isLogin) {
+        return Center(
+            child: ElevatedButton(
+                onPressed: loginDialog, child: Text(translate("Login"))));
+      } else if (gFFI.userModel.networkError.isNotEmpty) {
+        return netWorkErrorWidget();
+      } else {
+        return Column(
+          children: [
+            // NOT use Offstage to wrap LinearProgressIndicator
+            if (gFFI.abModel.currentAbLoading.value &&
+                gFFI.abModel.currentAbEmpty)
+              const LinearProgressIndicator(),
+            buildErrorBanner(context,
+                loading: gFFI.abModel.currentAbLoading,
+                err: gFFI.abModel.abPullError,
+                retry: null,
+                close: gFFI.abModel.clearPullErrors),
+            buildErrorBanner(context,
+                loading: gFFI.abModel.currentAbLoading,
+                err: gFFI.abModel.currentAbPushError,
+                retry: null, // remove retry
+                close: () => gFFI.abModel.currentAbPushError.value = ''),
+            Expanded(
+              child: Obx(() => stateGlobal.isPortrait.isTrue
+                  ? _buildAddressBookPortrait()
+                  : _buildAddressBookLandscape()),
+            ),
+          ],
+        );
+      }
+    });
+  }
+
+  Widget _buildTechnicianCentralDirectory() {
+    final session = TechnicianCentralSession.instance;
+    final identity = session.identity;
+
+    if (!session.hasSession || identity == null) {
+      return const Center(
+        child: Text('Sessão central do técnico não está ativa.'),
+      );
+    }
+
+    final directoryFuture = _centralDirectoryFuture ??=
+        _loadCentralDirectory();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 10,
+          ),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: Theme.of(context).dividerColor,
+            ),
+          ),
+          child: Row(
             children: [
-              // NOT use Offstage to wrap LinearProgressIndicator
-              if (gFFI.abModel.currentAbLoading.value &&
-                  gFFI.abModel.currentAbEmpty)
-                const LinearProgressIndicator(),
-              buildErrorBanner(context,
-                  loading: gFFI.abModel.currentAbLoading,
-                  err: gFFI.abModel.abPullError,
-                  retry: null,
-                  close: gFFI.abModel.clearPullErrors),
-              buildErrorBanner(context,
-                  loading: gFFI.abModel.currentAbLoading,
-                  err: gFFI.abModel.currentAbPushError,
-                  retry: null, // remove retry
-                  close: () => gFFI.abModel.currentAbPushError.value = ''),
+              const Icon(Icons.devices_other_outlined),
+              const SizedBox(width: 10),
               Expanded(
-                child: Obx(() => stateGlobal.isPortrait.isTrue
-                    ? _buildAddressBookPortrait()
-                    : _buildAddressBookLandscape()),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Dispositivos acessíveis',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      identity.displayName +
+                          ' (@' +
+                          identity.username +
+                          ')',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Atualizar dispositivos',
+                onPressed: _refreshCentralDirectory,
+                icon: const Icon(Icons.refresh),
+              ),
+              const SizedBox(width: 4),
+              TextButton.icon(
+                onPressed: () async {
+                  await session.logout();
+                },
+                icon: const Icon(Icons.logout, size: 18),
+                label: const Text('Sair'),
               ),
             ],
-          );
-        }
-      });
+          ),
+        ),
+        Expanded(
+          child: FutureBuilder<TechnicianAccessibleAgentsResult>(
+            future: directoryFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
+
+              final result = snapshot.data;
+
+              if (result == null || !result.succeeded) {
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_outlined,
+                          size: 36,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          result?.message ??
+                              'Não foi possível carregar os dispositivos acessíveis.',
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: _refreshCentralDirectory,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Tentar novamente'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              if (result.agents.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'Nenhum dispositivo foi liberado para este técnico.',
+                  ),
+                );
+              }
+
+              return Obx(() {
+                final search =
+                    peerSearchText.value.trim().toLowerCase();
+                final sortedBy = peerSort.value;
+                final agents = result.agents
+                    .where((agent) {
+                      if (search.isEmpty) {
+                        return true;
+                      }
+
+                      return agent.deviceId
+                              .toLowerCase()
+                              .contains(search) ||
+                          agent.displayName
+                              .toLowerCase()
+                              .contains(search) ||
+                          agent.capabilities.any(
+                            (capability) => capability
+                                .toLowerCase()
+                                .contains(search),
+                          );
+                    })
+                    .toList();
+
+                agents.sort((a, b) {
+                  switch (sortedBy) {
+                    case PeerSortType.status:
+                      final aRank =
+                          _centralOnlineRank(a.deviceId);
+                      final bRank =
+                          _centralOnlineRank(b.deviceId);
+                      final statusCompare =
+                          aRank.compareTo(bRank);
+
+                      if (statusCompare != 0) {
+                        return statusCompare;
+                      }
+
+                      return a.displayName
+                          .toLowerCase()
+                          .compareTo(
+                            b.displayName.toLowerCase(),
+                          );
+
+                    case PeerSortType.remoteHost:
+                    case PeerSortType.username:
+                      return a.displayName
+                          .toLowerCase()
+                          .compareTo(
+                            b.displayName.toLowerCase(),
+                          );
+
+                    case PeerSortType.remoteId:
+                    default:
+                      return a.deviceId.compareTo(b.deviceId);
+                  }
+                });
+
+                return GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate:
+                      const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 235,
+                    mainAxisExtent: 112,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: agents.length,
+                  itemBuilder: (context, index) {
+                    return _buildCentralAgentCard(
+                      agents[index],
+                    );
+                  },
+                );
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCentralAgentCard(
+    TechnicianAccessibleAgent agent,
+  ) {
+    final capabilityLabels = agent.capabilities
+        .map(_centralCapabilityLabel)
+        .join(' • ');
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => connect(
+          context,
+          agent.deviceId,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.computer_outlined),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      agent.displayName.trim().isEmpty
+                          ? formatID(agent.deviceId)
+                          : agent.displayName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _buildCentralOnlineBadge(
+                    agent.deviceId,
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                formatID(agent.deviceId),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                capabilityLabels.isEmpty
+                    ? 'Acesso autorizado'
+                    : capabilityLabels,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 5),
+              Row(
+                children: [
+                  Icon(
+                    Icons.verified_user_outlined,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 5),
+                  const Expanded(
+                    child: Text(
+                      'Autorizado pelo servidor central',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  int _centralOnlineRank(String deviceId) {
+    final state = _centralOnlineStates[deviceId];
+
+    if (state == true) {
+      return 0;
+    }
+
+    if (state == null) {
+      return 1;
+    }
+
+    return 2;
+  }
+
+  Widget _buildCentralOnlineBadge(String deviceId) {
+    final online = _centralOnlineStates[deviceId];
+    final label = online == null
+        ? 'Verificando'
+        : online
+            ? 'Online'
+            : 'Offline';
+    final color = online == null
+        ? Colors.amber
+        : online
+            ? Colors.green
+            : Colors.grey;
+
+    return Tooltip(
+      message: label,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 4,
+            backgroundColor: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(fontSize: 10),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _centralCapabilityLabel(String capability) {
+    switch (capability) {
+      case 'unattended':
+        return 'Não assistido';
+      case 'file_transfer':
+        return 'Arquivos';
+      case 'terminal':
+        return 'Terminal';
+      case 'view_camera':
+        return 'Câmera';
+      default:
+        return capability;
+    }
+  }
 
   Widget _buildAddressBookLandscape() {
     return Row(
