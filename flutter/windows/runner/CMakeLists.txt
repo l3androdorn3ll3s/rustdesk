@@ -28,6 +28,23 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_MINOR=${FLUTT
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_PATCH=${FLUTTER_VERSION_PATCH}")
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_BUILD=${FLUTTER_VERSION_BUILD}")
 
+function(remote_support_brand_define name fallback)
+  if(DEFINED ENV{${name}} AND NOT "$ENV{${name}}" STREQUAL "")
+    set(value "$ENV{${name}}")
+  else()
+    set(value "${fallback}")
+  endif()
+  string(REPLACE "\"" "\\\"" value "${value}")
+  target_compile_definitions(${BINARY_NAME} PRIVATE "${name}=\\\"${value}\\\"")
+endfunction()
+
+remote_support_brand_define(REMOTE_SUPPORT_BRAND_COMPANY_NAME "IdealSecurity")
+remote_support_brand_define(REMOTE_SUPPORT_BRAND_PRODUCT_NAME "IdealSecurity Remote Support")
+remote_support_brand_define(REMOTE_SUPPORT_BRAND_FILE_DESCRIPTION "IdealSecurity Remote Support")
+remote_support_brand_define(
+  REMOTE_SUPPORT_BRAND_WINDOWS_ICON
+  "resources/app_icon.ico"
+)
 # Disable Windows macros that collide with C++ standard library functions.
 target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 
