@@ -10,6 +10,7 @@ A brand profile controls presentation only:
 - company/product names;
 - Technician subtitle and central-auth footer;
 - logo/icon asset references;
+- Windows CompanyName/FileDescription/ProductName/icon metadata;
 - primary/accent colors;
 - light/dark sidebar colors;
 - border accent.
@@ -36,6 +37,9 @@ The Flutter product consumes:
 - `REMOTE_SUPPORT_BRAND_DARK_SIDEBAR_COLOR`
 - `REMOTE_SUPPORT_BRAND_BORDER_ACCENT_COLOR`
 
+Windows packaging metadata is supplied by the governed brand build script through
+build-environment definitions consumed by CMake/Runner.rc.
+
 Defaults preserve the current IdealSecurity skin.
 
 ## Adding a new brand
@@ -44,6 +48,7 @@ Defaults preserve the current IdealSecurity skin.
 2. Copy `brand.json` and change only presentation values.
 3. Add the brand logo/icon assets under `flutter/assets/` (prefer a namespaced
    folder such as `assets/brands/<brand-id>/`).
-4. Build through the governed RemoteSupport brand build script.
+4. Add a Windows `.ico` file and reference it from `windowsIcon`.
+5. Build through the governed RemoteSupport brand build script.
 
 Do not fork product logic for branding. A new brand is configuration + assets.
