@@ -140,6 +140,121 @@ class TechnicianCentralSession extends ChangeNotifier {
     }
   }
 
+  Future<TechnicianAccessibleAgentsResult> listAccessibleAgents() async {
+    final baseUri = _tryGetApiBaseUri();
+    final sessionToken = _sessionToken;
+
+    if (baseUri == null) {
+      return const TechnicianAccessibleAgentsResult.failure(
+        'O servidor central não está configurado com uma URL segura válida.',
+      );
+    }
+
+    if (sessionToken == null || sessionToken.isEmpty) {
+      return const TechnicianAccessibleAgentsResult.failure(
+        'Sua sessão não está ativa. Entre novamente.',
+      );
+    }
+
+    final client = HttpClient();
+
+    try {
+      final request = await client.getUrl(
+        baseUri.resolve('/api/agents/accessible'),
+      );
+
+      request.headers.set(
+        HttpHeaders.acceptHeader,
+        ContentType.json.mimeType,
+      );
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer $sessionToken',
+      );
+
+      final response = await request.close();
+      final body = await utf8.decoder.bind(response).join();
+
+      if (response.statusCode == HttpStatus.unauthorized) {
+        _clearSession();
+
+        return const TechnicianAccessibleAgentsResult.failure(
+          'Sua sessão expirou ou foi encerrada. Entre novamente.',
+        );
+      }
+
+      if (response.statusCode != HttpStatus.ok) {
+        return const TechnicianAccessibleAgentsResult.failure(
+          'Não foi possível carregar os dispositivos acessíveis.',
+        );
+      }
+
+      final decoded = jsonDecode(body);
+
+      if (decoded is! Map<String, dynamic> ||
+          decoded['agents'] is! List) {
+        return const TechnicianAccessibleAgentsResult.failure(
+          'A resposta do servidor central é inválida.',
+        );
+      }
+
+      final agents = <TechnicianAccessibleAgent>[];
+
+      for (final value in decoded['agents'] as List) {
+        if (value is! Map<String, dynamic>) {
+          return const TechnicianAccessibleAgentsResult.failure(
+            'A resposta do servidor central é inválida.',
+          );
+        }
+
+        final deviceId = value['deviceId'];
+        final displayName = value['displayName'];
+        final capabilitiesValue = value['capabilities'];
+
+        if (deviceId is! String ||
+            deviceId.isEmpty ||
+            displayName is! String ||
+            capabilitiesValue is! List) {
+          return const TechnicianAccessibleAgentsResult.failure(
+            'A resposta do servidor central é inválida.',
+          );
+        }
+
+        agents.add(
+          TechnicianAccessibleAgent(
+            deviceId: deviceId,
+            displayName: displayName,
+            capabilities: capabilitiesValue
+                .whereType<String>()
+                .toList(growable: false),
+          ),
+        );
+      }
+
+      return TechnicianAccessibleAgentsResult.success(
+        List.unmodifiable(agents),
+      );
+    } on HandshakeException {
+      return const TechnicianAccessibleAgentsResult.failure(
+        'Falha ao estabelecer a conexão HTTPS segura com o servidor central.',
+      );
+    } on SocketException {
+      return const TechnicianAccessibleAgentsResult.failure(
+        'Não foi possível conectar ao servidor central.',
+      );
+    } on FormatException {
+      return const TechnicianAccessibleAgentsResult.failure(
+        'A resposta do servidor central é inválida.',
+      );
+    } catch (_) {
+      return const TechnicianAccessibleAgentsResult.failure(
+        'Não foi possível carregar os dispositivos acessíveis.',
+      );
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   Future<TechnicianAgentConnectionResult> resolveAgentConnection({
     required String deviceId,
     required String capability,
@@ -255,8 +370,42 @@ class TechnicianCentralSession extends ChangeNotifier {
     }
   }
 
-  void logout() {
-    _clearSession();
+  Future<void> logout() async {
+    final baseUri = _tryGetApiBaseUri();
+    final sessionToken = _sessionToken;
+
+    if (baseUri == null ||
+        sessionToken == null ||
+        sessionToken.isEmpty) {
+      _clearSession();
+      return;
+    }
+
+    final client = HttpClient();
+
+    try {
+      final request = await client.postUrl(
+        baseUri.resolve('/api/auth/technicians/logout'),
+      );
+
+      request.headers.set(
+        HttpHeaders.acceptHeader,
+        ContentType.json.mimeType,
+      );
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer $sessionToken',
+      );
+
+      await request.close();
+    } catch (_) {
+      // Local session state must still be cleared. The server-side session
+      // expires independently if the explicit revocation request cannot be
+      // delivered.
+    } finally {
+      client.close(force: true);
+      _clearSession();
+    }
   }
 
   Uri? _tryGetApiBaseUri() {
@@ -389,3 +538,44 @@ class TechnicianAgentConnectionResult {
   final TechnicianAgentConnection? connection;
   final String? message;
 }
+
+class TechnicianAccessibleAgent {
+  const TechnicianAccessibleAgent({
+    required this.deviceId,
+    required this.displayName,
+    required this.capabilities,
+  });
+
+  final String deviceId;
+  final String displayName;
+  final List<String> capabilities;
+}
+
+class TechnicianAccessibleAgentsResult {
+  const TechnicianAccessibleAgentsResult._({
+    required this.succeeded,
+    required this.agents,
+    required this.message,
+  });
+
+  const TechnicianAccessibleAgentsResult.failure(
+    String message,
+  ) : this._(
+          succeeded: false,
+          agents: const [],
+          message: message,
+        );
+
+  const TechnicianAccessibleAgentsResult.success(
+    List<TechnicianAccessibleAgent> agents,
+  ) : this._(
+          succeeded: true,
+          agents: agents,
+          message: null,
+        );
+
+  final bool succeeded;
+  final List<TechnicianAccessibleAgent> agents;
+  final String? message;
+}
+
