@@ -29,6 +29,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
 
 import '../consts.dart';
+import 'brand/brand_profile.dart';
 import 'common/widgets/overlay.dart';
 import 'mobile/pages/file_manager_page.dart';
 import 'mobile/pages/remote_page.dart';
@@ -252,18 +253,18 @@ class MyTheme {
   MyTheme._();
 
   static const Color grayBg = Color(0xFFF7F5F0);
-  static const Color brandSidebar = Color(0xFFE8E1D5);
-  static const Color brandDark = Color(0xFF252117);
-  static const Color accent = Color(0xFFDC9919);
-  static const Color accent50 = Color(0x77DC9919);
-  static const Color accent80 = Color(0xAADC9919);
+  static const Color brandSidebar = RemoteSupportBrand.lightSidebarColor;
+  static const Color brandDark = RemoteSupportBrand.darkSidebarColor;
+  static const Color accent = RemoteSupportBrand.primaryColor;
+  static const Color accent50 = RemoteSupportBrand.primaryColor50;
+  static const Color accent80 = RemoteSupportBrand.primaryColor80;
   static const Color canvasColor = Color(0xFF212121);
   static const Color border = Color(0xFFCCCCCC);
   static const Color idColor = Color(0xFF00B6F0);
   static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
   static const Color cmIdColor = Color(0xFF21790B);
   static const Color dark = Colors.black87;
-  static const Color button = Color(0xFFDC9919);
+  static const Color button = RemoteSupportBrand.primaryColor;
   static const Color hoverBorder = Color(0xFF999999);
 
   // ListTile
@@ -3831,7 +3832,7 @@ Widget loadPowered(BuildContext context) {
   ).marginOnly(top: 6);
 }
 
-const _kBrandLogoAsset = 'assets/brand_logo.png';
+const _kBrandLogoAsset = RemoteSupportBrand.logoAsset;
 const _kDefaultLogoAsset = 'assets/logo.png';
 const _kLightLogoAsset = 'assets/logo_light.png';
 const _kDarkLogoAsset = 'assets/logo_dark.png';
@@ -3900,7 +3901,7 @@ class _LogoState extends State<_Logo> {
 Widget loadLogo() => const _Logo();
 
 Widget loadIcon(double size) {
-  return Image.asset('assets/icon.png',
+  return Image.asset(RemoteSupportBrand.iconAsset,
       width: size,
       height: size,
       errorBuilder: (ctx, error, stackTrace) => SvgPicture.asset(
