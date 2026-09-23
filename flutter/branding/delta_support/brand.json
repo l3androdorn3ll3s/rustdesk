@@ -1,0 +1,17 @@
+{
+  "id": "delta_support",
+  "companyName": "Delta",
+  "productName": "Delta Support",
+  "technicianSubtitle": "Acesso remoto seguro",
+  "centralAuthFooter": "Autenticação centralizada pelo Delta Support.",
+  "logoAsset": "assets/delta_support_logo.png",
+  "iconAsset": "assets/delta_support_icon.png",
+  "primaryColor": "0xFF129BFF",
+  "primaryColor50": "0x77129BFF",
+  "primaryColor80": "0xAA129BFF",
+  "lightSidebarColor": "0xFFEAF4FF",
+  "darkSidebarColor": "0xFF071422",
+  "borderAccentColor": "0xFF1DA1FF",
+  "fileDescription": "Delta Support",
+  "windowsIcon": "windows/runner/resources/delta_support.ico"
+}
