@@ -251,10 +251,10 @@ class _AddressBookState extends State<AddressBook> {
                 padding: const EdgeInsets.all(12),
                 gridDelegate:
                     const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 310,
-                  mainAxisExtent: 150,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
+                  maxCrossAxisExtent: 235,
+                  mainAxisExtent: 112,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
                 ),
                 itemCount: result.agents.length,
                 itemBuilder: (context, index) {
@@ -285,14 +285,14 @@ class _AddressBookState extends State<AddressBook> {
           agent.deviceId,
         ),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   const Icon(Icons.computer_outlined),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       agent.displayName.trim().isEmpty
@@ -301,7 +301,7 @@ class _AddressBookState extends State<AddressBook> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                        fontSize: 14,
                       ),
                     ),
                   ),
@@ -312,15 +312,16 @@ class _AddressBookState extends State<AddressBook> {
                 formatID(agent.deviceId),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 capabilityLabels.isEmpty
                     ? 'Acesso autorizado'
                     : capabilityLabels,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 5),
               Row(
                 children: [
                   Icon(
