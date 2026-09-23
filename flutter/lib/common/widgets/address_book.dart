@@ -19,6 +19,7 @@ import 'package:get/get.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 
 import '../../common.dart';
+import '../../desktop/services/technician_central_session.dart';
 import 'dialog.dart';
 import 'login.dart';
 
@@ -36,41 +37,327 @@ class AddressBook extends StatefulWidget {
 
 class _AddressBookState extends State<AddressBook> {
   var menuPos = RelativeRect.fill;
+  Future<TechnicianAccessibleAgentsResult>? _centralDirectoryFuture;
 
   @override
-  Widget build(BuildContext context) => Obx(() {
-        if (!gFFI.userModel.isLogin) {
-          return Center(
-              child: ElevatedButton(
-                  onPressed: loginDialog, child: Text(translate("Login"))));
-        } else if (gFFI.userModel.networkError.isNotEmpty) {
-          return netWorkErrorWidget();
-        } else {
-          return Column(
+  void initState() {
+    super.initState();
+
+    if (kIdealSecurityTechnicianEdition) {
+      TechnicianCentralSession.instance.addListener(
+        _onTechnicianCentralSessionChanged,
+      );
+
+      if (TechnicianCentralSession.instance.hasSession) {
+        _centralDirectoryFuture =
+            TechnicianCentralSession.instance.listAccessibleAgents();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    if (kIdealSecurityTechnicianEdition) {
+      TechnicianCentralSession.instance.removeListener(
+        _onTechnicianCentralSessionChanged,
+      );
+    }
+
+    super.dispose();
+  }
+
+  void _onTechnicianCentralSessionChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _centralDirectoryFuture =
+          TechnicianCentralSession.instance.hasSession
+              ? TechnicianCentralSession.instance.listAccessibleAgents()
+              : null;
+    });
+  }
+
+  void _refreshCentralDirectory() {
+    setState(() {
+      _centralDirectoryFuture =
+          TechnicianCentralSession.instance.listAccessibleAgents();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (kIdealSecurityTechnicianEdition) {
+      return _buildTechnicianCentralDirectory();
+    }
+
+    return Obx(() {
+      if (!gFFI.userModel.isLogin) {
+        return Center(
+            child: ElevatedButton(
+                onPressed: loginDialog, child: Text(translate("Login"))));
+      } else if (gFFI.userModel.networkError.isNotEmpty) {
+        return netWorkErrorWidget();
+      } else {
+        return Column(
+          children: [
+            // NOT use Offstage to wrap LinearProgressIndicator
+            if (gFFI.abModel.currentAbLoading.value &&
+                gFFI.abModel.currentAbEmpty)
+              const LinearProgressIndicator(),
+            buildErrorBanner(context,
+                loading: gFFI.abModel.currentAbLoading,
+                err: gFFI.abModel.abPullError,
+                retry: null,
+                close: gFFI.abModel.clearPullErrors),
+            buildErrorBanner(context,
+                loading: gFFI.abModel.currentAbLoading,
+                err: gFFI.abModel.currentAbPushError,
+                retry: null, // remove retry
+                close: () => gFFI.abModel.currentAbPushError.value = ''),
+            Expanded(
+              child: Obx(() => stateGlobal.isPortrait.isTrue
+                  ? _buildAddressBookPortrait()
+                  : _buildAddressBookLandscape()),
+            ),
+          ],
+        );
+      }
+    });
+  }
+
+  Widget _buildTechnicianCentralDirectory() {
+    final session = TechnicianCentralSession.instance;
+    final identity = session.identity;
+
+    if (!session.hasSession || identity == null) {
+      return const Center(
+        child: Text('Sessão central do técnico não está ativa.'),
+      );
+    }
+
+    final directoryFuture = _centralDirectoryFuture ??=
+        session.listAccessibleAgents();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 10,
+          ),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: Theme.of(context).dividerColor,
+            ),
+          ),
+          child: Row(
             children: [
-              // NOT use Offstage to wrap LinearProgressIndicator
-              if (gFFI.abModel.currentAbLoading.value &&
-                  gFFI.abModel.currentAbEmpty)
-                const LinearProgressIndicator(),
-              buildErrorBanner(context,
-                  loading: gFFI.abModel.currentAbLoading,
-                  err: gFFI.abModel.abPullError,
-                  retry: null,
-                  close: gFFI.abModel.clearPullErrors),
-              buildErrorBanner(context,
-                  loading: gFFI.abModel.currentAbLoading,
-                  err: gFFI.abModel.currentAbPushError,
-                  retry: null, // remove retry
-                  close: () => gFFI.abModel.currentAbPushError.value = ''),
+              const Icon(Icons.devices_other_outlined),
+              const SizedBox(width: 10),
               Expanded(
-                child: Obx(() => stateGlobal.isPortrait.isTrue
-                    ? _buildAddressBookPortrait()
-                    : _buildAddressBookLandscape()),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Dispositivos acessíveis',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      identity.displayName +
+                          ' (@' +
+                          identity.username +
+                          ')',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Atualizar dispositivos',
+                onPressed: _refreshCentralDirectory,
+                icon: const Icon(Icons.refresh),
+              ),
+              const SizedBox(width: 4),
+              TextButton.icon(
+                onPressed: () async {
+                  await session.logout();
+                },
+                icon: const Icon(Icons.logout, size: 18),
+                label: const Text('Sair'),
               ),
             ],
-          );
-        }
-      });
+          ),
+        ),
+        Expanded(
+          child: FutureBuilder<TechnicianAccessibleAgentsResult>(
+            future: directoryFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
+
+              final result = snapshot.data;
+
+              if (result == null || !result.succeeded) {
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_outlined,
+                          size: 36,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          result?.message ??
+                              'Não foi possível carregar os dispositivos acessíveis.',
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: _refreshCentralDirectory,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Tentar novamente'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              if (result.agents.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'Nenhum dispositivo foi liberado para este técnico.',
+                  ),
+                );
+              }
+
+              return GridView.builder(
+                padding: const EdgeInsets.all(12),
+                gridDelegate:
+                    const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 310,
+                  mainAxisExtent: 150,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                itemCount: result.agents.length,
+                itemBuilder: (context, index) {
+                  return _buildCentralAgentCard(
+                    result.agents[index],
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCentralAgentCard(
+    TechnicianAccessibleAgent agent,
+  ) {
+    final capabilityLabels = agent.capabilities
+        .map(_centralCapabilityLabel)
+        .join(' • ');
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => connect(
+          context,
+          agent.deviceId,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.computer_outlined),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      agent.displayName.trim().isEmpty
+                          ? formatID(agent.deviceId)
+                          : agent.displayName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                formatID(agent.deviceId),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                capabilityLabels.isEmpty
+                    ? 'Acesso autorizado'
+                    : capabilityLabels,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.verified_user_outlined,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 5),
+                  const Expanded(
+                    child: Text(
+                      'Autorizado pelo servidor central',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _centralCapabilityLabel(String capability) {
+    switch (capability) {
+      case 'unattended':
+        return 'Não assistido';
+      case 'file_transfer':
+        return 'Arquivos';
+      case 'terminal':
+        return 'Terminal';
+      case 'view_camera':
+        return 'Câmera';
+      default:
+        return capability;
+    }
+  }
 
   Widget _buildAddressBookLandscape() {
     return Row(
