@@ -62,27 +62,27 @@ else()
       "resources/app_icon.ico")
 endif()
 
-string(REPLACE "\"" "\\\""
-  REMOTE_SUPPORT_BRAND_COMPANY_NAME_VALUE
-  "${REMOTE_SUPPORT_BRAND_COMPANY_NAME_VALUE}")
-string(REPLACE "\"" "\\\""
-  REMOTE_SUPPORT_BRAND_PRODUCT_NAME_VALUE
-  "${REMOTE_SUPPORT_BRAND_PRODUCT_NAME_VALUE}")
-string(REPLACE "\"" "\\\""
-  REMOTE_SUPPORT_BRAND_FILE_DESCRIPTION_VALUE
-  "${REMOTE_SUPPORT_BRAND_FILE_DESCRIPTION_VALUE}")
-string(REPLACE "\"" "\\\""
-  REMOTE_SUPPORT_BRAND_WINDOWS_ICON_VALUE
-  "${REMOTE_SUPPORT_BRAND_WINDOWS_ICON_VALUE}")
+# Resource Compiler (rc.exe) is sensitive to quoted /D values containing
+# spaces. Do not pass customer-facing strings as target_compile_definitions.
+# Generate a header instead and include it from Runner.rc.
+foreach(_brand_value
+    REMOTE_SUPPORT_BRAND_COMPANY_NAME_VALUE
+    REMOTE_SUPPORT_BRAND_PRODUCT_NAME_VALUE
+    REMOTE_SUPPORT_BRAND_FILE_DESCRIPTION_VALUE
+    REMOTE_SUPPORT_BRAND_WINDOWS_ICON_VALUE)
+  string(REPLACE "\\" "\\\\" ${_brand_value} "${${_brand_value}}")
+  string(REPLACE "\"" "\\\"" ${_brand_value} "${${_brand_value}}")
+endforeach()
 
-target_compile_definitions(${BINARY_NAME} PRIVATE
-  "REMOTE_SUPPORT_BRAND_COMPANY_NAME=\\\"${REMOTE_SUPPORT_BRAND_COMPANY_NAME_VALUE}\\\"")
-target_compile_definitions(${BINARY_NAME} PRIVATE
-  "REMOTE_SUPPORT_BRAND_PRODUCT_NAME=\\\"${REMOTE_SUPPORT_BRAND_PRODUCT_NAME_VALUE}\\\"")
-target_compile_definitions(${BINARY_NAME} PRIVATE
-  "REMOTE_SUPPORT_BRAND_FILE_DESCRIPTION=\\\"${REMOTE_SUPPORT_BRAND_FILE_DESCRIPTION_VALUE}\\\"")
-target_compile_definitions(${BINARY_NAME} PRIVATE
-  "REMOTE_SUPPORT_BRAND_WINDOWS_ICON=\\\"${REMOTE_SUPPORT_BRAND_WINDOWS_ICON_VALUE}\\\"")
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/remote_support_brand_config.h.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/remote_support_brand_config.h"
+  @ONLY
+)
+
+target_include_directories(${BINARY_NAME} PRIVATE
+  "${CMAKE_CURRENT_BINARY_DIR}"
+)
 
 # Disable Windows macros that collide with C++ standard library functions.
 target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
