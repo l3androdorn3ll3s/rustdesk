@@ -41,8 +41,10 @@ class PeerTabModel with ChangeNotifier {
     true,
     true,
     !isWeb && bind.mainGetLocalOption(key: "disable-discovery-panel") != "Y",
-    !(bind.isDisableAb() || bind.isDisableAccount()),
-    !(bind.isDisableGroupPanel() || bind.isDisableAccount()),
+    kIdealSecurityTechnicianEdition ||
+        !(bind.isDisableAb() || bind.isDisableAccount()),
+    !kIdealSecurityTechnicianEdition &&
+        !(bind.isDisableGroupPanel() || bind.isDisableAccount()),
   ]);
   final List<bool> _isVisible = List.filled(maxTabCount, true, growable: false);
   List<bool> get isVisibleEnabled => () {
@@ -125,6 +127,11 @@ class PeerTabModel with ChangeNotifier {
   }
 
   String tabTooltip(int index) {
+    if (kIdealSecurityTechnicianEdition &&
+        index == PeerTabIndex.ab.index) {
+      return 'Dispositivos acessíveis';
+    }
+
     if (index >= 0 && index < tabNames.length) {
       return translate(tabNames[index]);
     }
