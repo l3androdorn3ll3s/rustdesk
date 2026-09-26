@@ -279,11 +279,22 @@ class _AddressBookState extends State<AddressBook> {
                       ),
                     ),
                     const SizedBox(height: 2),
+                    Tooltip(
+                      message: identity.displayName,
+                      child: Text(
+                        identity.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
                     Text(
-                      identity.displayName +
-                          ' (@' +
-                          identity.username +
-                          ')',
+                      '@${identity.username}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
