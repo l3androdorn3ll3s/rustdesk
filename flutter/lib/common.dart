@@ -2660,6 +2660,16 @@ connect(BuildContext context, String id,
     return;
   }
 
+  if (kIdealSecurityTechnicianEdition) {
+    final technicianDisplayName =
+        TechnicianCentralSession.instance.identity?.displayName.trim() ?? '';
+
+    await bind.mainSetLocalOption(
+      key: 'technician-display-name',
+      value: technicianDisplayName,
+    );
+  }
+
   if (!isDesktop || desktopType == DesktopType.main) {
     try {
       if (Get.isRegistered<IDTextEditingController>()) {

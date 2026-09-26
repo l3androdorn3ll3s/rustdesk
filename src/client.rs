@@ -2692,6 +2692,13 @@ impl LoginConfigHandler {
         if display_name.is_empty() {
             display_name = crate::username();
         }
+        let technician_display_name =
+            LocalConfig::get_option("technician-display-name");
+
+        if !technician_display_name.trim().is_empty() {
+            display_name = technician_display_name.trim().to_owned();
+        }
+
         let display_name = display_name
             .split_whitespace()
             .map(|word| {
